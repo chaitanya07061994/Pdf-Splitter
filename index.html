@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Splitter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(90deg, #2980b9, #6dd5fa);
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #007BFF;
+        }
+
+        .input-label {
+            font-weight: bold;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        .split-button {
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 4px;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .split-button:hover {
+            background-color: #0056b3;
+        }
+
+        #output {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        #output p {
+            font-size: 18px;
+            color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PDF Splitter</h1>
+        <div class="input-label">Select a PDF file:</div>
+        <input type="file" id="pdfInput" accept=".pdf" class="input-field">
+        <div class="input-label">Enter page ranges (e.g., 1-3,4-6,7-10):</div>
+        <input type="text" id="pageRanges" placeholder="Page ranges" class="input-field">
+        <button class="split-button" onclick="splitPDF()">Split PDF</button>
+        <div id="output"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.16.0/pdf-lib.js"></script>
+    <script>
+        async function splitPDF() {
+            const pdfInput = document.getElementById('pdfInput');
+            const pageRangesInput = document.getElementById('pageRanges');
+            const output = document.getElementById('output');
+            output.innerHTML = '';
+
+            if (pdfInput.files.length === 0) {
+                output.innerHTML = '<p>Please select a PDF file.</p>';
+                return;
+            }
+
+            const file = pdfInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = async function(e) {
+                const pdfData = new Uint8Array(e.target.result);
+                const pageRanges = pageRangesInput.value.split(',');
+
+                try {
+                    const pdfDoc = await PDFLib.PDFDocument.load(pdfData);
+
+                    const splitPdfDataArray = [];
+
+                    for (const pageRange of pageRanges) {
+                        const [startPage, endPage] = pageRange.split('-').map(Number);
+
+                        if (isNaN(startPage) || isNaN(endPage) || startPage < 1 || endPage > pdfDoc.getPageCount()) {
+                            output.innerHTML = '<p>Please enter valid page ranges.</p>';
+                            return;
+                        }
+
+                        const newPdf = await PDFLib.PDFDocument.create();
+                        
+                        for (let i = startPage; i <= endPage; i++) {
+                            const [copiedPage] = await newPdf.copyPages(pdfDoc, [i - 1]);
+                            newPdf.addPage(copiedPage);
+                        }
+                        
+                        const splitPdfData = await newPdf.save();
+                        splitPdfDataArray.push(splitPdfData);
+                    }
+
+                    // Download the split PDFs
+                    for (let i = 0; i < splitPdfDataArray.length; i++) {
+                        const blob = new Blob([splitPdfDataArray[i]], { type: 'application/pdf' });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `split_${i + 1}.pdf`;
+                        a.textContent = `Split ${i + 1}`;
+                        output.appendChild(a);
+                    }
+
+                    output.innerHTML += '<p>PDF split successfully. Click to Download</p>';
+                } catch (error) {
+                    console.error('Error:', error);
+                    output.innerHTML = '<p>An error occurred while splitting the PDF.</p>';
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+    </script>
+</body>
+</html>
